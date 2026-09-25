@@ -1,111 +1,123 @@
-# Liczniki energii przez Modbus - Finder Opta + Python
+# Finder Opta + CODESYS - reading energy meters over Modbus
 
-Odczyt trzech liczników energii przez Modbus i zapis pomiarów do pliku CSV.
+Read three energy meters over Modbus and log every measurement to a CSV file.
 
-Sterownik **Finder Opta** zbiera dane z liczników i wystawia je na rejestrach
-Modbus TCP. Skrypt w Pythonie łączy się z Optą po sieci, dekoduje wartości
-i dopisuje je do pliku CSV co dwie sekundy.
+A **Finder Opta** controller polls the meters over Modbus RTU and exposes the
+readings on Modbus TCP input registers. A Python script connects to the Opta
+over the network, decodes the values and appends them to a CSV file every two
+seconds.
 
 ```
-liczniki energii  --Modbus RTU-->  Finder Opta  --Modbus TCP-->  Python  -->  CSV
+energy meters  --Modbus RTU-->  Finder Opta  --Modbus TCP-->  Python  -->  CSV
 ```
 
-## Co jest w repozytorium
+## What is in this repository
 
-| Plik | Co to jest |
+| File | What it is |
 |---|---|
-| `pobierz.py` | skrypt odczytujący rejestry z Opty i zapisujący pomiary do CSV |
-| `liczniki_odczyt.project` | projekt CODESYS dla Finder Opta - odczyt liczników po Modbus RTU i wystawienie wartości na rejestrach Modbus TCP |
-| `pomiary_liczniki.csv` | przykładowe dane z rzeczywistego odczytu |
+| `liczniki_odczyt.project` | CODESYS project for the Finder Opta - polls the meters over Modbus RTU and publishes the values on Modbus TCP input registers |
+| `pobierz.py` | Python client that reads the registers and writes the measurements to CSV |
+| `pomiary_liczniki.csv` | sample data from a real run |
 
-## Jak to uruchomić
+## Running it
 
-### Sterownik
+### Controller
 
-Plik `liczniki_odczyt.project` otwierasz w **CODESYS** i wgrywasz na Finder Opta.
-To on odpytuje liczniki po Modbus RTU i przepisuje odczyty do rejestrów
-wejściowych Modbus TCP, z których czyta potem skrypt.
+Open `liczniki_odczyt.project` in **CODESYS** and download it to the Finder
+Opta. The controller does the RTU side of the job; the Python script only reads
+what the Opta has already collected.
 
-### Skrypt
+### Script
 
-Potrzebny Python 3 i biblioteka `pymodbus`:
+Python 3 and `pymodbus`:
 
 ```bash
 pip install pymodbus
 ```
 
-Ustaw adres sterownika w `pobierz.py`, jeśli masz inny niż domyślny:
+Set the controller address in `pobierz.py` if yours differs:
 
 ```python
 OPTA_IP = "10.0.0.2"
 PORT = 502
-INTERWAL_CZASOWY = 2   # sekundy między odczytami
+INTERWAL_CZASOWY = 2   # seconds between reads
 ```
 
-Uruchom:
+Run it:
 
 ```bash
 python pobierz.py
 ```
 
-Skrypt dopisuje kolejne wiersze do `pomiary_liczniki.csv` aż do przerwania
-przez `Ctrl + C`. Nagłówek zapisuje tylko raz, przy tworzeniu pliku, więc
-kolejne uruchomienia dokładają dane do istniejącego zbioru.
+The script appends rows to `pomiary_liczniki.csv` until you stop it with
+`Ctrl + C`. The header is written once, when the file is created, so repeated
+runs add to the existing dataset instead of starting over.
 
-## Mapa rejestrów
+## Register map
 
-Skrypt czyta **50 rejestrów wejściowych** od adresu 0. Rejestr 0 jest pomijany,
-dane zaczynają się od rejestru 1.
+The script reads **50 input registers** starting at address 0. Register 0 is
+skipped; the data starts at register 1.
 
-Każdy licznik zajmuje **14 rejestrów**, czyli 7 wartości typu float. Każdy float
-to dwa rejestry 16-bitowe w kolejności big-endian (`>HH` -> `>f`).
+Each meter occupies **14 registers**, that is 7 float values. Every float is two
+16-bit registers, high word first (`>HH` -> `>f`).
 
-| Offset w bloku licznika | Wielkość |
+| Offset inside the meter block | Value |
 |---|---|
-| 0-1 | moc czynna |
-| 2-3 | moc bierna |
-| 4-5 | moc pozorna |
-| 6-7 | współczynnik mocy (cos phi) |
-| 8-9 | częstotliwość |
-| 10-11 | napięcie |
-| 12-13 | prąd |
+| 0-1 | active power |
+| 2-3 | reactive power |
+| 4-5 | apparent power |
+| 6-7 | power factor |
+| 8-9 | frequency |
+| 10-11 | voltage |
+| 12-13 | current |
 
-Bloki idą po kolei: licznik 1 od rejestru 1, licznik 2 od rejestru 15,
-licznik 3 od rejestru 29.
+The blocks follow one another: meter 1 starts at register 1, meter 2 at
+register 15, meter 3 at register 29.
 
-## Format pliku CSV
+## CSV format
 
-Separatorem jest **średnik**, żeby Excel od razu dzielił dane na kolumny bez
-importu. Plik ma 22 kolumny: znacznik czasu i po 7 wielkości na każdy z trzech
-liczników.
+The separator is a **semicolon**, so Excel splits the data into columns without
+an import step. The file has 22 columns: a timestamp plus 7 values for each of
+the three meters. Column names are in Polish, matching the script.
 
 ```
 Czas;L1_MocCzynna;L1_MocBierna;L1_MocPozorna;L1_CosPhi;L1_Czestotliwosc;L1_Napiecie;L1_Prad;L2_...;L3_...
 ```
 
-W dołączonym przykładzie widać typowy obraz stanowiska: licznik 1 i 3 mierzą
-pracujące odbiorniki (12,5 W i 16,4 W), licznik 2 pokazuje zera, bo nie ma na
-nim obciążenia - przy zerowym prądzie cos phi wynosi 1, a napięcie i
-częstotliwość są mierzone normalnie.
+| Polish | English |
+|---|---|
+| `Czas` | timestamp |
+| `MocCzynna` | active power |
+| `MocBierna` | reactive power |
+| `MocPozorna` | apparent power |
+| `CosPhi` | power factor |
+| `Czestotliwosc` | frequency |
+| `Napiecie` | voltage |
+| `Prad` | current |
 
-## Uwagi praktyczne
+The sample file shows a typical bench: meters 1 and 3 measure running loads
+(12.5 W and 16.4 W), meter 2 reads zeros because nothing is connected to it -
+with no current the power factor is reported as 1, while voltage and frequency
+are still measured normally.
 
-- **Ujemna moc bierna** w przykładzie (-6 var) oznacza obciążenie pojemnościowe.
-  To normalne przy zasilaczach impulsowych i nie jest błędem odczytu.
-- **Kolejność bajtów.** Jeśli wartości wyglądają na przypadkowe, sprawdź
-  kolejność słów. Ten skrypt zakłada starsze słowo jako pierwsze. Przy odwrotnej
-  kolejności zamień argumenty w `words_to_float`.
-- **Brak obsługi ponownego łączenia.** Przy zerwaniu sieci skrypt zgłosi błąd
-  odczytu i będzie próbował dalej w kolejnych cyklach, ale nie odtwarza
-  połączenia TCP. Przy dłuższych pomiarach warto to dopisać.
-- **Interwał 2 sekundy** daje około 1800 wierszy na godzinę. Przy całodobowym
-  zbieraniu plik urośnie do kilkudziesięciu tysięcy wierszy - wtedy lepszym
-  miejscem na dane jest baza, nie CSV.
+## Practical notes
 
-## Do czego to służy
+- **Negative reactive power** in the sample (-6 var) means a capacitive load.
+  That is normal with switched-mode power supplies and is not a decoding error.
+- **Word order.** If the values look like noise, check the word order. This
+  script assumes high word first. For the opposite order, swap the arguments in
+  `words_to_float`.
+- **No reconnect logic.** If the network drops, the script reports a read error
+  and keeps trying on the next cycle, but it does not re-establish the TCP
+  connection. Worth adding for long runs.
+- **A two second interval** produces about 1800 rows per hour. Logging around
+  the clock will grow the file to tens of thousands of rows - at that point the
+  data belongs in a database rather than a CSV.
 
-Materiał powstał na potrzeby kursów ControlByte z komunikacji przemysłowej
-i analizy danych. Pokazuje pełną ścieżkę od licznika na szynie DIN do pliku,
-który da się otworzyć w Excelu albo wczytać do Pythona.
+## Why this exists
 
-[controlbyte.pl](https://www.controlbyte.pl)
+Built for the ControlByte courses on industrial communication and data
+analysis. It shows the whole path from a DIN rail meter to a file you can open
+in Excel or load into Python.
+
+[controlbyte.tech](https://controlbyte.tech)
