@@ -15,10 +15,18 @@ liczniki energii  --Modbus RTU-->  Finder Opta  --Modbus TCP-->  Python  -->  CS
 | Plik | Co to jest |
 |---|---|
 | `pobierz.py` | skrypt odczytujący rejestry z Opty i zapisujący pomiary do CSV |
-| `liczniki_odczyt.project` | projekt sterownika dla Finder Opta |
+| `liczniki_odczyt.project` | projekt CODESYS dla Finder Opta - odczyt liczników po Modbus RTU i wystawienie wartości na rejestrach Modbus TCP |
 | `pomiary_liczniki.csv` | przykładowe dane z rzeczywistego odczytu |
 
 ## Jak to uruchomić
+
+### Sterownik
+
+Plik `liczniki_odczyt.project` otwierasz w **CODESYS** i wgrywasz na Finder Opta.
+To on odpytuje liczniki po Modbus RTU i przepisuje odczyty do rejestrów
+wejściowych Modbus TCP, z których czyta potem skrypt.
+
+### Skrypt
 
 Potrzebny Python 3 i biblioteka `pymodbus`:
 
